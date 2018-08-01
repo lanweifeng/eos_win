@@ -291,7 +291,7 @@ if(!($buildType -eq "eos")) {
 		& cmake -G "Visual Studio 15 2017 Win64" -T $toolset -B"$NEWBUILDDIR" -H"." -DCMAKE_INSTALL_PREFIX:PATH="$extPath\secp256k1-zkp\install" -DCMAKE_C_FLAGS="-I`"$extPath\mpir-3.0.0\lib\x64\$config`"" -DCMAKE_SYSTEM_VERSION="$PLATFORM_SYSTEM_VERSION"
 
 		"`nBuilding secp256k1-zkp`n"
-		& cmake --build $NEWBUILDDIR --config $config --target install -- /maxcpucount
+		& cmake --build $NEWBUILDDIR --config $config --target install
 		popd
 
 		Test-BuildDep $secp256k1_zkp_LIBPATH "secp256k1-zkp"
@@ -313,7 +313,7 @@ if(!($buildType -eq "eos")) {
 		& cmake -G "Visual Studio 15 2017 Win64" -T $toolset -B"$NEWBUILDDIR" -H"." -DLLVM_INCLUDE_TESTS=NO -DCMAKE_INSTALL_PREFIX:PATH="$extPath\wasm-compiler\llvm\install" -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=WebAssembly -DLLVM_USE_CRT_DEBUG=MDd -DLLVM_USE_CRT_RELEASE=MD -DCMAKE_SYSTEM_VERSION="$PLATFORM_SYSTEM_VERSION"
 
 		"`nBuilding wasm-compiler`n"
-		& cmake --build $NEWBUILDDIR --config $config --target install -- /maxcpucount
+		& cmake --build $NEWBUILDDIR --config $config --target install
 		popd
 		Test-BuildDep $wasm_compiler_LIBPATH "wasm-compiler"
 	}
