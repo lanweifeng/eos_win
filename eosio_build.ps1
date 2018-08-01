@@ -15,7 +15,7 @@
 param(
 [switch]$help,
 [switch]$clean,
-[string]$config="Release",
+[string]$config="Debug",
 [string]$buildType="full",
 [string]$extPath="",
 [string]$mpirArch="core2",
@@ -29,7 +29,7 @@ if($extPath -like "") {
 $extPath="$CURRENTFULLPATH\externals"
 }
 
-$PLATFORM_SYSTEM_VERSION = "10.0.16299.0"
+$PLATFORM_SYSTEM_VERSION = "10.0.17134.0"
 
 function Test-BuildDep ($checkdirpath, $dependencyName)
 {
@@ -152,7 +152,7 @@ if (!($env:Path -like ("*Windows Kits\10*"))) {
 	$env:Path += ";C:\Windows\System32\wbem"
 
 	pushd $VS141COMNTOOLS
-	cmd.exe /c "vcvarsall.bat x86_x64&set" |
+	cmd.exe /c "vcvarsall.bat x64&set" |
 	foreach {
 	  if ($_ -match "=") {
 		$v = $_.split("="); set-item -force -path "ENV:\$($v[0])"  -value "$($v[1])"
@@ -207,13 +207,7 @@ if(!($buildType -eq "eos")) {
 	#----------------------
 
 	# Install gettext 0.19.8
-	if(!(Test-Path -Path $gettext_LIBPATH )){
-	
-		"`Creating cmake configuration for gettext-0.19.8`n"
-		Copy-Item "scripts\msvc-configs\gettext-0.19.8\cmake.in" "$extPath\gettext-0.19.8\CMakeLists.txt"
-		Copy-Item "scripts\msvc-configs\gettext-0.19.8\config.h" "$extPath\gettext-0.19.8\config.h"
-		Copy-Item "scripts\msvc-configs\gettext-0.19.8\libgnuintl.h" "$extPath\gettext-0.19.8\libgnuintl.h"
-		
+	if(!(Test-Path -Path $gettext_LIBPATH )){	
 		"`nConfiguring gettext 0.19.8`n"
 		pushd ("$extPath\gettext-0.19.8")
 		$NEWBUILDDIR = "build"
@@ -264,7 +258,6 @@ if(!($buildType -eq "eos")) {
 	if(!(Test-Path -Path $mpir_LIBPATH )){
 		"`nConfiguring mpir-3.0.0`n"
 		pushd ("$extPath\mpir-3.0.0\build.vc15")
-
 		AddMicrosoftPlataformToProject "$extPath\mpir-3.0.0\build.vc15\dll_mpir_core2\dll_mpir_core2.vcxproj"
 		AddMicrosoftPlataformToProject "$extPath\mpir-3.0.0\build.vc15\dll_mpir_gc\dll_mpir_gc.vcxproj"
 		AddMicrosoftPlataformToProject "$extPath\mpir-3.0.0\build.vc15\dll_mpir_haswell_avx\dll_mpir_haswell_avx.vcxproj"
