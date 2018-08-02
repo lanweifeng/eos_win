@@ -4,7 +4,7 @@
         ignore = dirty
 [submodule "libraries/appbase"]
 	path = libraries/appbase
-	url = https://github.com/eosio/appbase
+	url = https://github.com/JaminChan/appbase
         ignore = dirty
 [submodule "contracts/musl/upstream"]
 	path = contracts/musl/upstream
