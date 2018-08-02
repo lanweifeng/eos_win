@@ -16,7 +16,7 @@
 	branch = eosio
 [submodule "externals/binaryen"]
 	path = externals/binaryen
-	url = https://github.com/EOSIO/binaryen
+	url = https://github.com/JaminChan/binaryen
 
 [submodule "libraries/softfloat"]
 	path = libraries/softfloat
