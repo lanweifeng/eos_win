@@ -277,25 +277,25 @@ namespace eosio {
 #define peer_dlog( PEER, FORMAT, ... ) \
   FC_MULTILINE_MACRO_BEGIN \
    if( logger.is_enabled( fc::log_level::debug ) ) \
-      logger.log( FC_LOG_MESSAGE( debug, peer_log_format + FORMAT, __VA_ARGS__ (PEER->get_logger_variant()) ) ); \
+      logger.log( FC_LOG_MESSAGE( debug, FORMAT, __VA_ARGS__) ); \
   FC_MULTILINE_MACRO_END
 
 #define peer_ilog( PEER, FORMAT, ... ) \
   FC_MULTILINE_MACRO_BEGIN \
    if( logger.is_enabled( fc::log_level::info ) ) \
-      logger.log( FC_LOG_MESSAGE( info, peer_log_format + FORMAT, __VA_ARGS__ (PEER->get_logger_variant()) ) ); \
+      logger.log( FC_LOG_MESSAGE( info, FORMAT, __VA_ARGS__) ); \
   FC_MULTILINE_MACRO_END
 
 #define peer_wlog( PEER, FORMAT, ... ) \
   FC_MULTILINE_MACRO_BEGIN \
    if( logger.is_enabled( fc::log_level::warn ) ) \
-      logger.log( FC_LOG_MESSAGE( warn, peer_log_format + FORMAT, __VA_ARGS__ (PEER->get_logger_variant()) ) ); \
+      logger.log( FC_LOG_MESSAGE( warn, FORMAT, __VA_ARGS__) ); \
   FC_MULTILINE_MACRO_END
 
 #define peer_elog( PEER, FORMAT, ... ) \
   FC_MULTILINE_MACRO_BEGIN \
    if( logger.is_enabled( fc::log_level::error ) ) \
-      logger.log( FC_LOG_MESSAGE( error, peer_log_format + FORMAT, __VA_ARGS__ (PEER->get_logger_variant())) ); \
+      logger.log( FC_LOG_MESSAGE( error, FORMAT, __VA_ARGS__) ); \
   FC_MULTILINE_MACRO_END
 
 

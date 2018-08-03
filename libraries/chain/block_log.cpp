@@ -176,10 +176,11 @@ namespace eosio { namespace chain {
          my->check_index_write();
 
          uint64_t pos = my->block_stream.tellp();
-         EOS_ASSERT(my->index_stream.tellp() == sizeof(uint64_t) * (b->block_num() - 1),
+		 uint64_t index_pos = my->index_stream.tellp();
+         EOS_ASSERT(index_pos == sizeof(uint64_t) * (b->block_num() - 1),
                    block_log_append_fail,
                    "Append to index file occuring at wrong position.",
-                   ("position", (uint64_t) my->index_stream.tellp())
+                   ("position", index_pos)
                    ("expected", (b->block_num() - 1) * sizeof(uint64_t)));
          auto data = fc::raw::pack(*b);
          my->block_stream.write(data.data(), data.size());

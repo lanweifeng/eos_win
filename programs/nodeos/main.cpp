@@ -19,6 +19,9 @@
 #include <boost/exception/diagnostic_information.hpp>
 
 #include "config.hpp"
+#ifdef WIN32
+#pragma comment(lib, "crypt32.lib")
+#endif
 
 using namespace appbase;
 using namespace eosio;
@@ -53,7 +56,11 @@ void configure_logging(const bfs::path& config_path)
 
 void logging_conf_loop()
 {
-   std::shared_ptr<boost::asio::signal_set> sighup_set(new boost::asio::signal_set(app().get_io_service(), SIGHUP));
+#ifdef WIN32
+	std::shared_ptr<boost::asio::signal_set> sighup_set(new boost::asio::signal_set(app().get_io_service(), SIGTERM, SIGABRT, SIGBREAK));
+#elif
+	std::shared_ptr<boost::asio::signal_set> sighup_set(new boost::asio::signal_set(app().get_io_service(), SIGHUP));
+#endif
    sighup_set->async_wait([sighup_set](const boost::system::error_code& err, int /*num*/) {
       if(!err)
       {

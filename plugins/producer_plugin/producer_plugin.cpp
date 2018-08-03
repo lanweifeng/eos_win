@@ -181,27 +181,28 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
             active_producers.insert(p.producer_name);
          }
 
-         std::set_intersection( _producers.begin(), _producers.end(),
-                                active_producers.begin(), active_producers.end(),
-                                boost::make_function_output_iterator( [&]( const chain::account_name& producer )
-         {
-            if( producer != bsp->header.producer ) {
-               auto itr = std::find_if( active_producer_to_signing_key.begin(), active_producer_to_signing_key.end(),
-                                        [&](const producer_key& k){ return k.producer_name == producer; } );
-               if( itr != active_producer_to_signing_key.end() ) {
-                  auto private_key_itr = _signature_providers.find( itr->block_signing_key );
-                  if( private_key_itr != _signature_providers.end() ) {
-                     auto d = bsp->sig_digest();
-                     auto sig = private_key_itr->second( d );
-                     _last_signed_block_time = bsp->header.timestamp;
-                     _last_signed_block_num  = bsp->block_num;
+		 std::function<void(const chain::account_name&)> f = [&](const chain::account_name& producer)
+		 {
+			 if (producer != bsp->header.producer) {
+				 auto itr = std::find_if(active_producer_to_signing_key.begin(), active_producer_to_signing_key.end(),
+					 [&](const producer_key& k) { return k.producer_name == producer; });
+				 if (itr != active_producer_to_signing_key.end()) {
+					 auto private_key_itr = _signature_providers.find(itr->block_signing_key);
+					 if (private_key_itr != _signature_providers.end()) {
+						 auto d = bsp->sig_digest();
+						 auto sig = private_key_itr->second(d);
+						 _last_signed_block_time = bsp->header.timestamp;
+						 _last_signed_block_num = bsp->block_num;
 
-   //                  ilog( "${n} confirmed", ("n",name(producer)) );
-                     _self->confirmed_block( { bsp->id, d, producer, sig } );
-                  }
-               }
-            }
-         } ) );
+						 //ilog( "${n} confirmed", ("n",name(producer)) );
+						 _self->confirmed_block({ bsp->id, d, producer, sig });
+					 }
+				 }
+			 }
+		 };
+		 auto it = boost::make_function_output_iterator(f);
+		 std::set_intersection(_producers.begin(), _producers.end(),
+							   active_producers.begin(), active_producers.end(), it);
 
          // since the watermark has to be set before a block is created, we are looking into the future to
          // determine the new schedule to identify producers that have become active
@@ -306,7 +307,9 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
             elog((e.to_detail_string()));
             except = true;
          } catch ( boost::interprocess::bad_alloc& ) {
+#ifndef WIN32
             raise(SIGUSR1);
+#endif
             return;
          }
 
@@ -387,7 +390,9 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
          } catch ( const guard_exception& e ) {
             app().get_plugin<chain_plugin>().handle_guard_exception(e);
          } catch ( boost::interprocess::bad_alloc& ) {
+#ifndef WIN32
             raise(SIGUSR1);
+#endif
          } CATCH_AND_CALL(send_response);
       }
 
@@ -1042,7 +1047,9 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
          }
 
       } catch ( boost::interprocess::bad_alloc& ) {
+#ifndef WIN32
          raise(SIGUSR1);
+#endif
          return start_block_result::failed;
       }
 
@@ -1140,7 +1147,9 @@ bool producer_plugin_impl::maybe_produce_block() {
       app().get_plugin<chain_plugin>().handle_guard_exception(e);
       return false;
    } catch ( boost::interprocess::bad_alloc& ) {
+#ifndef WIN32
       raise(SIGUSR1);
+#endif
       return false;
    } FC_LOG_AND_DROP();
 

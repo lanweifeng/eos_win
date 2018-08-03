@@ -156,20 +156,20 @@ class binaryen_runtime : public eosio::chain::wasm_runtime_interface {
  * @tparam T
  */
 template<typename T>
-inline array_ptr<T> array_ptr_impl (interpreter_interface* interface, uint32_t ptr, uint32_t length)
+inline array_ptr<T> array_ptr_impl (interpreter_interface* interfc, uint32_t ptr, uint32_t length)
 {
    EOS_ASSERT( length < INT_MAX/(uint32_t)sizeof(T), binaryen_exception, "length will overflow" );
-   return array_ptr<T>((T*)(interface->get_validated_pointer(ptr, length * (uint32_t)sizeof(T))));
+   return array_ptr<T>((T*)(interfc->get_validated_pointer(ptr, length * (uint32_t)sizeof(T))));
 }
 
 /**
  * class to represent an in-wasm-memory char array that must be null terminated
  */
-inline null_terminated_ptr null_terminated_ptr_impl(interpreter_interface* interface, uint32_t ptr)
+inline null_terminated_ptr null_terminated_ptr_impl(interpreter_interface* interfc, uint32_t ptr)
 {
-   char *value = interface->get_validated_pointer(ptr, 1);
+   char *value = interfc->get_validated_pointer(ptr, 1);
    const char* p = value;
-   const char* const top_of_memory = interface->memory.data + interface->current_memory_size;
+   const char* const top_of_memory = interfc->memory.data + interfc->current_memory_size;
    while(p < top_of_memory)
       if(*p++ == '\0')
          return null_terminated_ptr(value);
@@ -253,9 +253,9 @@ inline auto convert_native_to_literal(const interpreter_interface*, const fc::ti
    return Literal(val.sec_since_epoch());
 }
 
-inline auto convert_native_to_literal(const interpreter_interface* interface, char* ptr) {
-   const char* base = interface->memory.data;
-   const char* top_of_memory = base + interface->current_memory_size;
+inline auto convert_native_to_literal(const interpreter_interface* interfc, char* ptr) {
+   const char* base = interfc->memory.data;
+   const char* top_of_memory = base + interfc->current_memory_size;
    EOS_ASSERT(ptr >= base && ptr < top_of_memory, wasm_execution_error, "returning pointer not in linear memory");
    return Literal((int)(ptr - base));
 }
@@ -283,8 +283,8 @@ struct intrinsic_invoker_impl<Ret, std::tuple<>> {
    using next_method_type        = Ret (*)(interpreter_interface*, LiteralList&, int);
 
    template<next_method_type Method>
-   static Literal invoke(interpreter_interface* interface, LiteralList& args) {
-      return convert_native_to_literal(interface, Method(interface, args, args.size() - 1));
+   static Literal invoke(interpreter_interface* interfc, LiteralList& args) {
+      return convert_native_to_literal(interfc, Method(interfc, args, args.size() - 1));
    }
 
    template<next_method_type Method>
@@ -302,8 +302,8 @@ struct intrinsic_invoker_impl<void_type, std::tuple<>> {
    using next_method_type        = void_type (*)(interpreter_interface*, LiteralList&, int);
 
    template<next_method_type Method>
-   static Literal invoke(interpreter_interface* interface, LiteralList& args) {
-      Method(interface, args, args.size() - 1);
+   static Literal invoke(interpreter_interface* interfc, LiteralList& args) {
+      Method(interfc, args, args.size() - 1);
       return Literal();
    }
 
@@ -325,10 +325,10 @@ struct intrinsic_invoker_impl<Ret, std::tuple<Input, Inputs...>> {
    using then_type = Ret (*)(interpreter_interface*, Input, Inputs..., LiteralList&, int);
 
    template<then_type Then>
-   static Ret translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) {
+   static Ret translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) {
       auto& last = args.at(offset);
       auto native = convert_literal_to_native<Input>(last);
-      return Then(interface, native, rest..., args, (uint32_t)offset - 1);
+      return Then(interfc, native, rest..., args, (uint32_t)offset - 1);
    };
 
    template<then_type Then>
@@ -351,37 +351,37 @@ struct intrinsic_invoker_impl<Ret, std::tuple<array_ptr<T>, size_t, Inputs...>> 
    using then_type = Ret(*)(interpreter_interface*, array_ptr<T>, size_t, Inputs..., LiteralList&, int);
 
    template<then_type Then, typename U=T>
-   static auto translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<std::is_const<U>::value, Ret> {
+   static auto translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<std::is_const<U>::value, Ret> {
       static_assert(!std::is_pointer<U>::value, "Currently don't support array of pointers");
       uint32_t ptr = args.at((uint32_t)offset - 1).geti32();
       size_t length = args.at((uint32_t)offset).geti32();
-      T* base = array_ptr_impl<T>(interface, ptr, length);
+      T* base = array_ptr_impl<T>(interfc, ptr, length);
       if ( reinterpret_cast<uintptr_t>(base) % alignof(T) != 0 ) {
          wlog( "misaligned array of const values" );
          std::remove_const_t<T> copy[length];
          T* copy_ptr = &copy[0];
          memcpy( (void*)copy_ptr, (void*)base, length * sizeof(T) );
-         return Then(interface, static_cast<array_ptr<T>>(copy_ptr), length, rest..., args, (uint32_t)offset - 2);
+         return Then(interfc, static_cast<array_ptr<T>>(copy_ptr), length, rest..., args, (uint32_t)offset - 2);
       }
-      return Then(interface, static_cast<array_ptr<T>>(base), length, rest..., args, (uint32_t)offset - 2);
+      return Then(interfc, static_cast<array_ptr<T>>(base), length, rest..., args, (uint32_t)offset - 2);
    };
 
    template<then_type Then, typename U=T>
-   static auto translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<!std::is_const<U>::value, Ret> {
+   static auto translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<!std::is_const<U>::value, Ret> {
       static_assert(!std::is_pointer<U>::value, "Currently don't support array of pointers");
       uint32_t ptr = args.at((uint32_t)offset - 1).geti32();
       size_t length = args.at((uint32_t)offset).geti32();
-      T* base = array_ptr_impl<T>(interface, ptr, length);
+      T* base = array_ptr_impl<T>(interfc, ptr, length);
       if ( reinterpret_cast<uintptr_t>(base) % alignof(T) != 0 ) {
          wlog( "misaligned array of values" );
          std::remove_const_t<T> copy[length];
          T* copy_ptr = &copy[0];
          memcpy( (void*)copy_ptr, (void*)base, length * sizeof(T) );
-         Ret ret = Then(interface, static_cast<array_ptr<T>>(copy_ptr), length, rest..., args, (uint32_t)offset - 2);  
+         Ret ret = Then(interfc, static_cast<array_ptr<T>>(copy_ptr), length, rest..., args, (uint32_t)offset - 2);
          memcpy( (void*)base, (void*)copy_ptr, length * sizeof(T) );
          return ret;
       }
-      return Then(interface, static_cast<array_ptr<T>>(base), length, rest..., args, (uint32_t)offset - 2);
+      return Then(interfc, static_cast<array_ptr<T>>(base), length, rest..., args, (uint32_t)offset - 2);
    };
    
    template<then_type Then>
@@ -404,9 +404,9 @@ struct intrinsic_invoker_impl<Ret, std::tuple<null_terminated_ptr, Inputs...>> {
    using then_type = Ret(*)(interpreter_interface*, null_terminated_ptr, Inputs..., LiteralList&, int);
 
    template<then_type Then>
-   static Ret translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) {
+   static Ret translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) {
       uint32_t ptr = args.at((uint32_t)offset).geti32();
-      return Then(interface, null_terminated_ptr_impl(interface, ptr), rest..., args, (uint32_t)offset - 1);
+      return Then(interfc, null_terminated_ptr_impl(interfc, ptr), rest..., args, (uint32_t)offset - 1);
    };
 
    template<then_type Then>
@@ -429,12 +429,12 @@ struct intrinsic_invoker_impl<Ret, std::tuple<array_ptr<T>, array_ptr<U>, size_t
    using then_type = Ret(*)(interpreter_interface*, array_ptr<T>, array_ptr<U>, size_t, Inputs..., LiteralList&, int);
 
    template<then_type Then>
-   static Ret translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) {
+   static Ret translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) {
       uint32_t ptr_t = args.at((uint32_t)offset - 2).geti32();
       uint32_t ptr_u = args.at((uint32_t)offset - 1).geti32();
       size_t length = args.at((uint32_t)offset).geti32();
       static_assert(std::is_same<std::remove_const_t<T>, char>::value && std::is_same<std::remove_const_t<U>, char>::value, "Currently only support array of (const)chars");
-      return Then(interface, array_ptr_impl<T>(interface, ptr_t, length), array_ptr_impl<U>(interface, ptr_u, length), length, args, (uint32_t)offset - 3);
+      return Then(interfc, array_ptr_impl<T>(interfc, ptr_t, length), array_ptr_impl<U>(interfc, ptr_u, length), length, args, (uint32_t)offset - 3);
    };
 
    template<then_type Then>
@@ -455,11 +455,11 @@ struct intrinsic_invoker_impl<Ret, std::tuple<array_ptr<char>, int, size_t>> {
    using then_type = Ret(*)(interpreter_interface*, array_ptr<char>, int, size_t, LiteralList&, int);
 
    template<then_type Then>
-   static Ret translate_one(interpreter_interface* interface, LiteralList& args, int offset) {
+   static Ret translate_one(interpreter_interface* interfc, LiteralList& args, int offset) {
       uint32_t ptr = args.at((uint32_t)offset - 2).geti32();
       uint32_t value = args.at((uint32_t)offset - 1).geti32();
       size_t length = args.at((uint32_t)offset).geti32();
-      return Then(interface, array_ptr_impl<char>(interface, ptr, length), value, length, args, (uint32_t)offset - 3);
+      return Then(interfc, array_ptr_impl<char>(interfc, ptr, length), value, length, args, (uint32_t)offset - 3);
    };
 
    template<then_type Then>
@@ -482,32 +482,32 @@ struct intrinsic_invoker_impl<Ret, std::tuple<T *, Inputs...>> {
    using then_type = Ret (*)(interpreter_interface*, T *, Inputs..., LiteralList&, int);
 
    template<then_type Then, typename U=T>
-   static auto translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<std::is_const<U>::value, Ret> {
+   static auto translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<std::is_const<U>::value, Ret> {
       uint32_t ptr = args.at((uint32_t)offset).geti32();
-      T* base = array_ptr_impl<T>(interface, ptr, 1);
+      T* base = array_ptr_impl<T>(interfc, ptr, 1);
       if ( reinterpret_cast<uintptr_t>(base) % alignof(T) != 0 ) {
          wlog( "misaligned const pointer" );
          std::remove_const_t<T> copy;
          T* copy_ptr = &copy;
          memcpy( (void*)copy_ptr, (void*)base, sizeof(T) );
-         return Then(interface, copy_ptr, rest..., args, (uint32_t)offset - 1);
+         return Then(interfc, copy_ptr, rest..., args, (uint32_t)offset - 1);
       }
-      return Then(interface, base, rest..., args, (uint32_t)offset - 1);
+      return Then(interfc, base, rest..., args, (uint32_t)offset - 1);
    };
 
    template<then_type Then, typename U=T>
-   static auto translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<!std::is_const<U>::value, Ret> {
+   static auto translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<!std::is_const<U>::value, Ret> {
       uint32_t ptr = args.at((uint32_t)offset).geti32();
-      T* base = array_ptr_impl<T>(interface, ptr, 1);
+      T* base = array_ptr_impl<T>(interfc, ptr, 1);
       if ( reinterpret_cast<uintptr_t>(base) % alignof(T) != 0 ) {
          wlog( "misaligned pointer" );
          T copy;
          memcpy( (void*)&copy, (void*)base, sizeof(T) );
-         Ret ret = Then(interface, &copy, rest..., args, (uint32_t)offset - 1);
+         Ret ret = Then(interfc, &copy, rest..., args, (uint32_t)offset - 1);
          memcpy( (void*)base, (void*)&copy, sizeof(T) );
          return ret; 
       }
-      return Then(interface, base, rest..., args, (uint32_t)offset - 1);
+      return Then(interfc, base, rest..., args, (uint32_t)offset - 1);
    };
 
    template<then_type Then>
@@ -530,10 +530,10 @@ struct intrinsic_invoker_impl<Ret, std::tuple<const name&, Inputs...>> {
    using then_type = Ret (*)(interpreter_interface*, const name&, Inputs..., LiteralList&, int);
 
    template<then_type Then>
-   static Ret translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) {
+   static Ret translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) {
       uint64_t wasm_value = args.at((uint32_t)offset).geti64();
       auto value = name(wasm_value);
-      return Then(interface, value, rest..., args, (uint32_t)offset - 1);
+      return Then(interfc, value, rest..., args, (uint32_t)offset - 1);
    }
 
    template<then_type Then>
@@ -556,10 +556,10 @@ struct intrinsic_invoker_impl<Ret, std::tuple<const fc::time_point_sec&, Inputs.
    using then_type = Ret (*)(interpreter_interface*, const fc::time_point_sec&, Inputs..., LiteralList&, int);
 
    template<then_type Then>
-   static Ret translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) {
+   static Ret translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) {
       uint32_t wasm_value = args.at((uint32_t)offset).geti32();
       auto value = fc::time_point_sec(wasm_value);
-      return Then(interface, value, rest..., args, (uint32_t)offset - 1);
+      return Then(interfc, value, rest..., args, (uint32_t)offset - 1);
    }
 
    template<then_type Then>
@@ -583,36 +583,36 @@ struct intrinsic_invoker_impl<Ret, std::tuple<T &, Inputs...>> {
    using then_type = Ret (*)(interpreter_interface*, T &, Inputs..., LiteralList&, int);
 
    template<then_type Then, typename U=T>
-   static auto translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<std::is_const<U>::value, Ret> {
+   static auto translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<std::is_const<U>::value, Ret> {
       // references cannot be created for null pointers
       uint32_t ptr = args.at((uint32_t)offset).geti32();
       EOS_ASSERT(ptr != 0, binaryen_exception, "references cannot be created for null pointers");
-      T* base = array_ptr_impl<T>(interface, ptr, 1);
+      T* base = array_ptr_impl<T>(interfc, ptr, 1);
       if ( reinterpret_cast<uintptr_t>(base) % alignof(T) != 0 ) {
          wlog( "misaligned const reference" );
          std::remove_const_t<T> copy;
          T* copy_ptr = &copy;
          memcpy( (void*)copy_ptr, (void*)base, sizeof(T) );
-         return Then(interface, *copy_ptr, rest..., args, (uint32_t)offset - 1);
+         return Then(interfc, *copy_ptr, rest..., args, (uint32_t)offset - 1);
       }
-      return Then(interface, *base, rest..., args, (uint32_t)offset - 1);
+      return Then(interfc, *base, rest..., args, (uint32_t)offset - 1);
    }
 
    template<then_type Then, typename U=T>
-   static auto translate_one(interpreter_interface* interface, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<!std::is_const<U>::value, Ret> {
+   static auto translate_one(interpreter_interface* interfc, Inputs... rest, LiteralList& args, int offset) -> std::enable_if_t<!std::is_const<U>::value, Ret> {
       // references cannot be created for null pointers
       uint32_t ptr = args.at((uint32_t)offset).geti32();
       EOS_ASSERT(ptr != 0, binaryen_exception, "references cannot be created for null pointers");
-      T* base = array_ptr_impl<T>(interface, ptr, 1);
+      T* base = array_ptr_impl<T>(interfc, ptr, 1);
       if ( reinterpret_cast<uintptr_t>(base) % alignof(T) != 0 ) {
          wlog( "misaligned reference" );
          T copy;
          memcpy( (void*)&copy, (void*)base, sizeof(T) );
-         Ret ret = Then(interface, copy, rest..., args, (uint32_t)offset - 1);
+         Ret ret = Then(interfc, copy, rest..., args, (uint32_t)offset - 1);
          memcpy( (void*)base, (void*)&copy, sizeof(T) );
          return ret; 
       }
-      return Then(interface, *base, rest..., args, (uint32_t)offset - 1);
+      return Then(interfc, *base, rest..., args, (uint32_t)offset - 1);
    }
 
 
@@ -630,9 +630,9 @@ struct intrinsic_function_invoker {
    using impl = intrinsic_invoker_impl<Ret, std::tuple<Params...>>;
 
    template<MethodSig Method>
-   static Ret wrapper(interpreter_interface* interface, Params... params, LiteralList&, int) {
-      class_from_wasm<Cls>::value(interface->context).checktime();
-      return (class_from_wasm<Cls>::value(interface->context).*Method)(params...);
+   static Ret wrapper(interpreter_interface* interfc, Params... params, LiteralList&, int) {
+      class_from_wasm<Cls>::value(interfc->context).checktime();
+      return (class_from_wasm<Cls>::value(interfc->context).*Method)(params...);
    }
 
    template<MethodSig Method>
@@ -646,9 +646,9 @@ struct intrinsic_function_invoker<void, MethodSig, Cls, Params...> {
    using impl = intrinsic_invoker_impl<void_type, std::tuple<Params...>>;
 
    template<MethodSig Method>
-   static void_type wrapper(interpreter_interface* interface, Params... params, LiteralList& args, int offset) {
-      class_from_wasm<Cls>::value(interface->context).checktime();
-      (class_from_wasm<Cls>::value(interface->context).*Method)(params...);
+   static void_type wrapper(interpreter_interface* interfc, Params... params, LiteralList& args, int offset) {
+      class_from_wasm<Cls>::value(interfc->context).checktime();
+      (class_from_wasm<Cls>::value(interfc->context).*Method)(params...);
       return void_type();
    }
 

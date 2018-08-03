@@ -32,7 +32,7 @@
       } \
       throw new_exception; \
    } catch( const std::exception& e ) {  \
-      exception_type fce(FC_LOG_MESSAGE( warn, FORMAT" (${what})" ,__VA_ARGS__("what",e.what()))); \
+      exception_type fce(FC_LOG_MESSAGE( warn, FORMAT ,__VA_ARGS__)); \
       throw fce;\
    } catch( ... ) {  \
       throw fc::unhandled_exception( \

@@ -64,6 +64,11 @@ else()
 	add_definitions("-DENABLE_THREADING_PROTOTYPE=0")
 endif()
 
+IF( WIN32 )
+    add_definitions("-D_WIN32")
+	add_definitions("-D_WIN64")
+endif()
+
 add_subdirectory(Include/Inline)
 
 add_subdirectory(Source/Emscripten)

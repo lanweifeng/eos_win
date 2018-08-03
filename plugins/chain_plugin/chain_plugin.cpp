@@ -249,7 +249,11 @@ if( options.count(name) ) { \
 
 fc::time_point calculate_genesis_timestamp( string tstr ) {
    fc::time_point genesis_timestamp;
+#ifdef WIN32
+   if (stricmp(tstr.c_str(), "now") == 0) {
+#else
    if( strcasecmp (tstr.c_str(), "now") == 0 ) {
+#endif
       genesis_timestamp = fc::time_point::now();
    } else {
       genesis_timestamp = time_point::from_iso_string( tstr );
@@ -1314,7 +1318,9 @@ void read_write::push_block(const read_write::push_block_params& params, next_fu
       app().get_method<incoming::methods::block_sync>()(std::make_shared<signed_block>(params));
       next(read_write::push_block_results{});
    } catch ( boost::interprocess::bad_alloc& ) {
-      raise(SIGUSR1);
+#ifndef WIN32
+	   raise(SIGUSR1);
+#endif
    } CATCH_AND_CALL(next);
 }
 
@@ -1345,7 +1351,9 @@ void read_write::push_transaction(const read_write::push_transaction_params& par
 
 
    } catch ( boost::interprocess::bad_alloc& ) {
+#ifndef WIN32
       raise(SIGUSR1);
+#endif
    } CATCH_AND_CALL(next);
 }
 
