@@ -51,4 +51,8 @@ inline __int128 __clzti2(__int128 a)
            ((int32_t)f & ((int32_t)(sizeof(int64_t) * CHAR_BIT)));
 }
 
+typedef unsigned su_int;
+typedef          long long di_int;
+typedef unsigned long long du_int;
+
 #endif// __compiler_rt_int_t_h__
